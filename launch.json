@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run rPPG Dashboard Server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.py",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Run rPPG Engine (OpenCV window)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/rppg_engine.py",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

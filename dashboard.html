@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rPPG Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2335;
+    --border: rgba(255,255,255,0.07);
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --green: #22d3a8;
+    --blue: #60a5fa;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --radius: 12px;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .header h1 {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green);
+  }
+  .badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid;
+    letter-spacing: 0.05em;
+  }
+  .badge.live { border-color: var(--green); color: var(--green); }
+  .badge.sim { border-color: var(--amber); color: var(--amber); }
+  .badge.off { border-color: var(--muted); color: var(--muted); }
+
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+  .pulse-dot.inactive { background: var(--muted); animation: none; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: auto auto;
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .metrics-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    grid-row: span 2;
+  }
+
+  .bpm-card {
+    background: var(--surface2);
+    border-radius: var(--radius);
+    border: 1px solid rgba(34, 211, 168, 0.2);
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .bpm-label { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+  .bpm-value { font-size: 52px; font-weight: 700; color: var(--green); line-height: 1; letter-spacing: -2px; }
+  .bpm-unit { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .bpm-value.warn { color: var(--amber); }
+  .bpm-value.dim { color: var(--muted); font-size: 28px; padding-top: 12px; }
+
+  .metric-row { display: flex; flex-direction: column; gap: 4px; }
+  .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .metric-value { font-size: 14px; color: var(--text); }
+
+  .quality-bar-track {
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .quality-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--green);
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+
+  .face-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+  }
+  .face-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .face-dot.on { background: var(--green); }
+  .face-text { color: var(--muted); font-size: 11px; }
+
+  .chart-card { position: relative; }
+  .chart-title {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+  .chart-wrap { position: relative; height: 110px; }
+
+  .log-card { font-size: 11px; }
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: var(--green); font-size: 10px; min-width: 60px; }
+  .log-msg { color: var(--text); }
+
+  .footer {
+    margin-top: 12px;
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    gap: 20px;
+  }
+  kbd {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="pulse-dot inactive" id="pulseDot"></div>
+  <h1>rPPG Dashboard</h1>
+  <span class="badge off" id="modeBadge">connecting…</span>
+</div>
+
+<div class="grid">
+
+  <!-- LEFT: metric cards -->
+  <div class="metrics-col">
+    <div class="bpm-card">
+      <div class="bpm-label">Heart Rate</div>
+      <div class="bpm-value dim" id="bpmValue">––</div>
+      <div class="bpm-unit">beats per minute</div>
+    </div>
+
+    <div class="card">
+      <div class="metric-row">
+        <div class="metric-label">Signal Quality</div>
+        <div class="metric-value" id="qualityVal">0%</div>
+        <div class="quality-bar-track">
+          <div class="quality-bar-fill" id="qualityBar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="metric-row" style="margin-bottom:10px">
+        <div class="metric-label">Algorithm</div>
+        <div class="metric-value">POS + Bandpass</div>
+      </div>
+      <div class="metric-row" style="margin-bottom:10px">
+        <div class="metric-label">Filter range</div>
+        <div class="metric-value">0.7 – 3.5 Hz</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">Enhancement</div>
+        <div class="metric-value">CLAHE + Bilateral</div>
+      </div>
+    </div>
+
+    <div class="face-indicator">
+      <div class="face-dot" id="faceDot"></div>
+      <span class="face-text" id="faceText">Waiting for face…</span>
+    </div>
+  </div>
+
+  <!-- RIGHT TOP: raw signal -->
+  <div class="card chart-card">
+    <div class="chart-title">Raw POS signal</div>
+    <div class="chart-wrap">
+      <canvas id="rawChart" role="img" aria-label="Raw rPPG POS signal over time"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT BOTTOM: filtered signal + BPM trend -->
+  <div class="card chart-card">
+    <div class="chart-title">Filtered signal (bandpass 0.7–3.5 Hz)</div>
+    <div class="chart-wrap">
+      <canvas id="filtChart" role="img" aria-label="Bandpass-filtered rPPG signal over time"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- Log -->
+<div class="card log-card" style="margin-top:12px">
+  <div class="chart-title" style="margin-bottom:8px">Event log</div>
+  <div id="logList"></div>
+</div>
+
+<div class="footer">
+  <span>rPPG Pipeline v1.0</span>
+  <span>Server: <kbd>python server.py</kbd></span>
+  <span>OpenCV window: <kbd>python rppg_engine.py</kbd></span>
+  <span><kbd>e</kbd> toggle enhancement</span>
+  <span><kbd>q</kbd> quit</span>
+</div>
+
+<script>
+const CHART_POINTS = 90;
+const makeLabels = () => Array.from({length: CHART_POINTS}, (_, i) => '');
+
+function makeChart(id, color, label) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: makeLabels(),
+      datasets: [{
+        label,
+        data: new Array(CHART_POINTS).fill(null),
+        borderColor: color,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: true,
+        backgroundColor: color + '12',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: {
+          display: true,
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#64748b',
+            font: { size: 9, family: 'monospace' },
+            maxTicksLimit: 4,
+          },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+const rawChart = makeChart('rawChart', '#60a5fa', 'Raw POS');
+const filtChart = makeChart('filtChart', '#22d3a8', 'Filtered');
+
+function pushData(chart, newVals) {
+  const data = chart.data.datasets[0].data;
+  newVals.forEach(v => {
+    data.push(v);
+    if (data.length > CHART_POINTS) data.shift();
+  });
+  chart.update('none');
+}
+
+const logEntries = [];
+function addLog(msg, cls = '') {
+  const now = new Date();
+  const time = now.toTimeString().slice(0, 8);
+  logEntries.unshift({ time, msg, cls });
+  if (logEntries.length > 8) logEntries.pop();
+  document.getElementById('logList').innerHTML = logEntries.map(e =>
+    `<div class="log-entry"><span class="log-time">${e.time}</span><span class="log-msg">${e.msg}</span></div>`
+  ).join('');
+}
+
+let lastBpm = null;
+let connected = false;
+
+function onMetrics(m) {
+  if (!connected) {
+    connected = true;
+    document.getElementById('pulseDot').classList.remove('inactive');
+    addLog('Connected to rPPG server');
+  }
+
+  const badge = document.getElementById('modeBadge');
+  badge.textContent = m.mode === 'live' ? 'live camera' : 'simulation';
+  badge.className = 'badge ' + (m.mode === 'live' ? 'live' : 'sim');
+
+  // BPM
+  const bpmEl = document.getElementById('bpmValue');
+  if (m.bpm) {
+    bpmEl.textContent = Math.round(m.bpm);
+    bpmEl.className = 'bpm-value' + (m.bpm > 120 ? ' warn' : '');
+    if (lastBpm !== m.bpm) {
+      addLog(`Heart rate: ${Math.round(m.bpm)} BPM`);
+      lastBpm = m.bpm;
+    }
+  } else {
+    bpmEl.textContent = '––';
+    bpmEl.className = 'bpm-value dim';
+  }
+
+  // Quality
+  const qpct = Math.round(m.signal_quality * 100);
+  document.getElementById('qualityVal').textContent = qpct + '%';
+  const fill = document.getElementById('qualityBar');
+  fill.style.width = qpct + '%';
+  fill.style.background = qpct > 50 ? '#22d3a8' : qpct > 25 ? '#fbbf24' : '#f87171';
+
+  // Face
+  const faceDot = document.getElementById('faceDot');
+  const faceText = document.getElementById('faceText');
+  if (m.face_detected) {
+    faceDot.classList.add('on');
+    faceText.textContent = 'Face detected';
+  } else {
+    faceDot.classList.remove('on');
+    faceText.textContent = 'No face — center your face in frame';
+  }
+
+  // Charts
+  if (m.raw_signal?.length) pushData(rawChart, m.raw_signal.slice(-3));
+  if (m.filtered_signal?.length) pushData(filtChart, m.filtered_signal.slice(-3));
+}
+
+// Connect to SSE stream
+function connect() {
+  const es = new EventSource('http://localhost:5500/stream');
+  es.onmessage = e => {
+    try { onMetrics(JSON.parse(e.data)); } catch(err) {}
+  };
+  es.onerror = () => {
+    if (connected) {
+      addLog('Connection lost — retrying…');
+      connected = false;
+      document.getElementById('pulseDot').classList.add('inactive');
+      document.getElementById('modeBadge').textContent = 'disconnected';
+      document.getElementById('modeBadge').className = 'badge off';
+    }
+    es.close();
+    setTimeout(connect, 3000);
+  };
+}
+
+addLog('Dashboard ready — start server.py to connect');
+connect();
+</script>
+</body>
+</html>
